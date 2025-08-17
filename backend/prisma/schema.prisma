@@ -1,0 +1,338 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户模型
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  avatar    String?
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联关系
+  workflows         Workflow[]
+  workflowVersions  WorkflowVersion[]
+  collaborations    WorkflowCollaborator[]
+  comments          WorkflowComment[]
+  executions        WorkflowExecution[]
+  sessions          UserSession[]
+  apiKeys           ApiKey[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+  VIEWER
+}
+
+// 用户会话
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// API密钥
+model ApiKey {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  key         String   @unique
+  permissions String[] // JSON array of permissions
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+// 工作流模型
+model Workflow {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  active      Boolean           @default(false)
+  nodes       Json              // N8N nodes JSON
+  connections Json              // N8N connections JSON
+  settings    Json?             // Workflow settings JSON
+  staticData  Json?             // Static data JSON
+  tags        String[]
+  category    String?
+  visibility  WorkflowVisibility @default(PRIVATE)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  userId      String
+
+  // 关联关系
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions      WorkflowVersion[]
+  executions    WorkflowExecution[]
+  collaborators WorkflowCollaborator[]
+  comments      WorkflowComment[]
+  templates     WorkflowTemplate[]
+
+  @@map("workflows")
+}
+
+enum WorkflowVisibility {
+  PRIVATE
+  PUBLIC
+  TEAM
+}
+
+// 工作流版本
+model WorkflowVersion {
+  id          String   @id @default(cuid())
+  workflowId  String
+  version     Int
+  name        String
+  description String?
+  nodes       Json     // N8N nodes JSON
+  connections Json     // N8N connections JSON
+  settings    Json?    // Workflow settings JSON
+  changelog   String?
+  createdAt   DateTime @default(now())
+  createdBy   String
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  creator  User     @relation(fields: [createdBy], references: [id])
+
+  @@unique([workflowId, version])
+  @@map("workflow_versions")
+}
+
+// 工作流协作者
+model WorkflowCollaborator {
+  id          String               @id @default(cuid())
+  workflowId  String
+  userId      String
+  role        CollaboratorRole     @default(VIEWER)
+  permissions String[]             // JSON array of permissions
+  addedAt     DateTime             @default(now())
+  addedBy     String
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, userId])
+  @@map("workflow_collaborators")
+}
+
+enum CollaboratorRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+// 工作流评论
+model WorkflowComment {
+  id         String    @id @default(cuid())
+  workflowId String
+  userId     String
+  content    String
+  nodeId     String?   // 关联到特定节点
+  position   Json?     // 评论位置 {x, y}
+  parentId   String?   // 回复评论的父ID
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  workflow Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   WorkflowComment?   @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  WorkflowComment[]  @relation("CommentReplies")
+
+  @@map("workflow_comments")
+}
+
+// 工作流执行
+model WorkflowExecution {
+  id           String            @id @default(cuid())
+  workflowId   String
+  userId       String
+  mode         ExecutionMode     @default(MANUAL)
+  status       ExecutionStatus   @default(NEW)
+  startedAt    DateTime          @default(now())
+  stoppedAt    DateTime?
+  finished     Boolean           @default(false)
+  retryOf      String?           // 重试的原执行ID
+  data         Json?             // 执行数据和结果
+  error        String?           // 错误信息
+  duration     Int?              // 执行时长(毫秒)
+  nodeCount    Int?              // 节点数量
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_executions")
+}
+
+enum ExecutionMode {
+  MANUAL
+  TRIGGER
+  WEBHOOK
+  RETRY
+  SCHEDULED
+}
+
+enum ExecutionStatus {
+  NEW
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELED
+  CRASHED
+  WAITING
+}
+
+// 工作流模板
+model WorkflowTemplate {
+  id          String   @id @default(cuid())
+  workflowId  String
+  name        String
+  description String
+  category    String
+  tags        String[]
+  image       String?
+  featured    Boolean  @default(false)
+  totalViews  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_templates")
+}
+
+// 节点类型
+model NodeType {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  displayName  String
+  description  String
+  version      Int
+  group        String[] // 节点分组
+  properties   Json     // 节点属性定义
+  credentials  Json?    // 凭证定义
+  webhooks     Json?    // Webhook定义
+  icon         String?
+  iconUrl      String?
+  codex        Json?    // 节点文档和分类信息
+  isCustom     Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("node_types")
+}
+
+// Docker容器
+model DockerContainer {
+  id          String            @id @default(cuid())
+  containerId String            @unique
+  name        String
+  image       String
+  status      ContainerStatus
+  ports       Json              // 端口映射
+  environment Json?             // 环境变量
+  volumes     Json?             // 卷挂载
+  networks    Json?             // 网络配置
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("docker_containers")
+}
+
+enum ContainerStatus {
+  CREATED
+  RUNNING
+  PAUSED
+  RESTARTING
+  REMOVING
+  EXITED
+  DEAD
+}
+
+// MCP服务器
+model MCPServer {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  displayName String
+  description String?
+  command     String
+  args        String[]
+  environment Json?       // 环境变量
+  status      MCPStatus   @default(INACTIVE)
+  version     String?
+  config      Json?       // 服务器配置
+  tools       Json?       // 可用工具列表
+  resources   Json?       // 可用资源列表
+  lastPing    DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("mcp_servers")
+}
+
+enum MCPStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  CONNECTING
+}
+
+// 系统设置
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  category  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// 审计日志
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  resourceId String?
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
