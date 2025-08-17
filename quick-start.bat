@@ -19,29 +19,33 @@ if !errorLevel! neq 0 (
 
 echo [INFO] Starting N8N Web Workflow Platform...
 
-REM Enter docker directory
-cd docker
-
-REM Start all services
+REM Start all services using dev compose file
 echo [INFO] Starting Docker containers...
-docker-compose up -d
+docker-compose -f docker-compose.dev.yml up -d
 
 if !errorLevel! neq 0 (
     echo [ERROR] Failed to start services
-    pause
-    exit /b 1
+    echo [INFO] Trying with docker directory...
+    cd docker
+    docker-compose up -d
+    if !errorLevel! neq 0 (
+        echo [ERROR] Failed to start services from docker directory too
+        pause
+        exit /b 1
+    )
+    cd ..
 )
 
 echo [SUCCESS] Services started successfully!
 
 REM Wait for services to start
 echo [INFO] Waiting for services to start...
-timeout /t 15 /nobreak >nul
+timeout /t 20 /nobreak >nul
 
 REM Show service status
 echo.
 echo [INFO] Service status:
-docker-compose ps
+docker-compose -f docker-compose.dev.yml ps 2>nul || (cd docker && docker-compose ps && cd ..)
 
 echo.
 echo [SUCCESS] N8N Web Workflow Platform is now running!

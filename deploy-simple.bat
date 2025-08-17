@@ -124,24 +124,53 @@ cd ..
 
 REM Start Docker services
 echo [INFO] Starting Docker services...
-cd docker
-if exist docker-compose.yml (
-    docker-compose pull
-    docker-compose up -d
+if exist docker-compose.dev.yml (
+    echo [INFO] Using development compose file...
+    docker-compose -f docker-compose.dev.yml pull
+    docker-compose -f docker-compose.dev.yml up -d
     if !errorLevel! neq 0 (
-        echo [ERROR] Docker services failed to start
+        echo [ERROR] Docker services failed to start with dev compose
+        echo [INFO] Trying with docker directory...
+        cd docker
+        if exist docker-compose.yml (
+            docker-compose pull
+            docker-compose up -d
+            if !errorLevel! neq 0 (
+                echo [ERROR] Docker services failed to start
+                cd ..
+                pause
+                exit /b 1
+            )
+        ) else (
+            echo [ERROR] docker-compose.yml not found in docker directory
+            cd ..
+            pause
+            exit /b 1
+        )
+        cd ..
+    )
+    echo [SUCCESS] Docker services started
+) else (
+    echo [INFO] Development compose file not found, trying docker directory...
+    cd docker
+    if exist docker-compose.yml (
+        docker-compose pull
+        docker-compose up -d
+        if !errorLevel! neq 0 (
+            echo [ERROR] Docker services failed to start
+            cd ..
+            pause
+            exit /b 1
+        )
+        echo [SUCCESS] Docker services started
+    ) else (
+        echo [ERROR] docker-compose.yml not found
         cd ..
         pause
         exit /b 1
     )
-    echo [SUCCESS] Docker services started
-) else (
-    echo [ERROR] docker-compose.yml not found
     cd ..
-    pause
-    exit /b 1
 )
-cd ..
 
 REM Wait for services to start
 echo [INFO] Waiting for services to start...
