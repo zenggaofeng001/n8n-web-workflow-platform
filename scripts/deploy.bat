@@ -1,113 +1,107 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-REM N8N Web工作流平台部署脚本 (Windows版本)
-REM 作者: N8N Web Platform Team
-REM 版本: 1.0.0
+REM N8N Web Workflow Platform Deployment Script (Windows)
+REM Author: N8N Web Platform Team
+REM Version: 1.0.0
 
-title N8N Web工作流平台 - 自动部署
+title N8N Web Workflow Platform - Auto Deploy
 
 echo ==========================================
-echo   N8N Web工作流平台 自动部署脚本
-echo   版本: 1.0.0 (Windows)
+echo   N8N Web Workflow Platform Auto Deploy
+echo   Version: 1.0.0 (Windows)
 echo ==========================================
 echo.
 
-REM 设置颜色
-set "RED=[91m"
-set "GREEN=[92m"
-set "YELLOW=[93m"
-set "BLUE=[94m"
-set "NC=[0m"
-
-REM 检查管理员权限
+REM Check administrator privileges
 net session >nul 2>&1
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR]%NC% 请以管理员身份运行此脚本
+if !errorLevel! neq 0 (
+    echo [ERROR] Please run this script as administrator
     pause
     exit /b 1
 )
 
-REM 检查系统要求
-echo %BLUE%[INFO]%NC% 检查系统要求...
+REM Check system requirements
+echo [INFO] Checking system requirements...
 
-REM 检查Docker Desktop
+REM Check Docker Desktop
 docker --version >nul 2>&1
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR]%NC% Docker Desktop未安装或未启动
-    echo 请先安装并启动Docker Desktop
+if !errorLevel! neq 0 (
+    echo [ERROR] Docker Desktop is not installed or not running
+    echo Please install and start Docker Desktop first
     pause
     exit /b 1
 )
 
-REM 检查Docker Compose
+REM Check Docker Compose
 docker-compose --version >nul 2>&1
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR]%NC% Docker Compose未安装
-    echo 请确保Docker Desktop包含Docker Compose
+if !errorLevel! neq 0 (
+    echo [ERROR] Docker Compose is not installed
+    echo Please ensure Docker Desktop includes Docker Compose
     pause
     exit /b 1
 )
 
-REM 检查Node.js
+REM Check Node.js
 node --version >nul 2>&1
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR]%NC% Node.js未安装
-    echo 请先安装Node.js 18+版本
+if !errorLevel! neq 0 (
+    echo [ERROR] Node.js is not installed
+    echo Please install Node.js 18+ first
     pause
     exit /b 1
 )
 
-REM 检查npm
+REM Check npm
 npm --version >nul 2>&1
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR]%NC% npm未安装
+if !errorLevel! neq 0 (
+    echo [ERROR] npm is not installed
     pause
     exit /b 1
 )
 
-REM 检查Git
+REM Check Git
 git --version >nul 2>&1
-if %errorLevel% neq 0 (
-    echo %RED%[ERROR]%NC% Git未安装
-    echo 请先安装Git
+if !errorLevel! neq 0 (
+    echo [ERROR] Git is not installed
+    echo Please install Git first
     pause
     exit /b 1
 )
 
-echo %GREEN%[SUCCESS]%NC% 系统要求检查通过
+echo [SUCCESS] System requirements check passed
 
-REM 创建环境变量文件
-echo %BLUE%[INFO]%NC% 创建环境变量文件...
+REM Create environment variables file
+echo [INFO] Creating environment variables file...
 
 if not exist .env (
-    echo # 数据库配置 > .env
+    echo # Database Configuration > .env
     echo POSTGRES_PASSWORD=n8n_platform_secure_password >> .env
     echo DATABASE_URL=postgresql://n8n_platform:n8n_platform_secure_password@localhost:5432/n8n_platform >> .env
     echo. >> .env
-    echo # Redis配置 >> .env
+    echo # Redis Configuration >> .env
     echo REDIS_PASSWORD=redis_secure_password >> .env
     echo. >> .env
-    echo # JWT配置 >> .env
+    echo # JWT Configuration >> .env
     echo JWT_SECRET=your-super-secret-jwt-key-change-this-in-production >> .env
     echo. >> .env
-    echo # N8N配置 >> .env
+    echo # N8N Configuration >> .env
     echo N8N_BASIC_AUTH_USER=admin >> .env
     echo N8N_BASIC_AUTH_PASSWORD=admin123 >> .env
     echo. >> .env
-    echo # 前端配置 >> .env
+    echo # Frontend Configuration >> .env
     echo FRONTEND_URL=http://localhost:3000 >> .env
     echo. >> .env
-    echo # 监控配置 >> .env
+    echo # Monitoring Configuration >> .env
     echo GRAFANA_USER=admin >> .env
     echo GRAFANA_PASSWORD=admin123 >> .env
     echo. >> .env
-    echo # 环境 >> .env
+    echo # Environment >> .env
     echo NODE_ENV=production >> .env
-    
-    echo %GREEN%[SUCCESS]%NC% 创建了 .env 文件
+
+    echo [SUCCESS] Created .env file
 ) else (
-    echo %YELLOW%[WARNING]%NC% .env 文件已存在，跳过创建
+    echo [WARNING] .env file already exists, skipping creation
 )
 
 REM 创建前端环境变量
